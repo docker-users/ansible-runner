@@ -1,0 +1,62 @@
+name: Publish 
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+on:
+  push:
+    branches: [ "master", 'test' ]
+    tags: [ '*' ]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "docker image tag"
+        required: true 
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/ansible-runner
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: docker/setup-buildx-action@v2
+
+      - name: "Login container image registry ${{ env.REGISTRY }}"
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Generate image url with tag"
+        if: github.event_name == 'push' && github.ref_name != 'master'
+        run: echo "image_tag=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: "Generate image url with master(latest)"
+        if: github.event_name == 'push' && github.ref_name == 'master'
+        run: echo "image_tag=latest" >> $GITHUB_ENV
+
+      - name: "Generate image url manually"
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "image_tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+
+      # https://github.com/docker/build-push-action
+      - name: "Build and publish"
+        id: build-and-push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true 
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.image_tag }}"
