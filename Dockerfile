@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 
-RUN pip install ansible \
-        python-dotenv \
-        invoke
+RUN pip install ansible python-dotenv invoke toml \
+    && pip cache purne
 
-# ENTRYPOINT ["/bin/bash"]
+ADD entrypoint.py /entrypoint.py
+RUN chmod +x /entrypoint.py
+ENTRYPOINT ["/entrypoint.py"]
 CMD ["ansible-playbook"]
